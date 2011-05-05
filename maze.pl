@@ -110,7 +110,8 @@ sub asterione($$$$){
     return if $self->isCellExit($x,$y);
     my @neighbors = $self->getCellNeighbors($x, $y);
     while (scalar @neighbors){
-        my ($tox, $toy, $dir) = @{ splice(@neighbors, rand(@neighbors), 1) };
+        my ($tox, $toy, $dir) = 
+            @{ splice(@neighbors, rand(@neighbors), 1) };
         next if $visited->[$tox][$toy];
         $self->openWall($x, $y, $dir);
         $self->asterione($tox, $toy, $visited);
@@ -128,7 +129,8 @@ sub teseo($$$$){
     }
     my @neighbors = $self->getCellOpenedNeighbors($x, $y);
     while (scalar @neighbors){
-        my ($tox, $toy, $dir) = @{ splice(@neighbors, rand(@neighbors), 1) };
+        my ($tox, $toy, $dir) = 
+            @{ splice(@neighbors, rand(@neighbors), 1) };
         next if $visited->[$tox][$toy];
         my $isSolution = $self->teseo($tox, $toy, $visited);
         if ($isSolution){
@@ -162,7 +164,10 @@ sub toText(){
     @l1 = ();
     for ($x = 0; $x < $self->{x}; $x++){
         my $solution = $self->{solution}[$x][$self->{y} -1] ? '.' : ' ';
-        push(@l1, $self->isWallOpen($x, $self->{y} -1, 'S') ? $solution x 2 : '-' x 2);
+        push(@l1, 
+            $self->isWallOpen($x, $self->{y} -1, 'S') ? 
+                $solution x 2 : '-' x 2
+        );
     }
 
     $out .= '+' . join('+', @l1) . '+' . "\n";
@@ -198,22 +203,37 @@ sub toImage($$){
 
         XX: for ($xx = 0; $xx < $self->{x}; $xx++){
 
-            $img->filledRectangle($xx * $WX, $yy * $WY, ($xx + 1) * $WY, ($yy + 1) * $WY, $cl_red)
+            $img->filledRectangle(
+                $xx * $WX, $yy * $WY, ($xx + 1) * $WX, ($yy + 1) * $WY, 
+                $cl_red
+            )
                 if $self->isSolution($xx, $yy);
             
-            $img->line($xx * $WX, $yy * $WY, ($xx + 1) * $WX, $yy * $WY, $cl_black)
+            $img->line(
+                    $xx * $WX, $yy * $WY, ($xx + 1) * $WX, $yy * $WY, 
+                    $cl_black
+            )
                 unless $self->isWallOpen($xx, $yy, 'N');
 
-            $img->line($xx * $WX, $yy * $WY, $xx * $WX, ($yy + 1) * $WY, $cl_black)
+            $img->line(
+                    $xx * $WX, $yy * $WY, $xx * $WX, ($yy + 1) * $WY, 
+                    $cl_black
+            )
                 unless $self->isWallOpen($xx, $yy, 'W');
         }
 
-        $img->line($xx * $WX - 1, $yy * $WY, $xx * $WX -1, ($yy + 1) * $WY, $cl_black)
+        $img->line(
+            $xx * $WX - 1, $yy * $WY, $xx * $WX -1, ($yy + 1) * $WY, 
+            $cl_black
+        )
             unless $self->isWallOpen($xx - 1, $yy, 'E');
     }
 
     for ($xx = 0; $xx < $self->{x}; $xx++){
-        $img->line($xx * $WX, $yy * $WY - 1, ($xx + 1) * $WX, $yy * $WY - 1, $cl_black)
+        $img->line(
+            $xx * $WX, $yy * $WY - 1, ($xx + 1) * $WX, $yy * $WY - 1, 
+            $cl_black
+    )
                 unless $self->isWallOpen($xx, $yy - 1, 'S');
     }
 
