@@ -64,7 +64,6 @@ sub isWallOpen($$$){
 }
 
 sub openWall($$$) {
-
     my ($self, $x, $y, $dir) = @_;
 
     my ($wx, $wy, $wdir) = $self->_getWallIndex($x, $y, $dir);    
