@@ -42,27 +42,34 @@ sub new {
     return $self;
 }
 
+sub _getWallIndex($$$){
+    my ($self, $x, $y, $dir) = @_;
+
+    my @idx =
+        $dir eq 'N' ? ($x,      $y,     'N') :
+        $dir eq 'S' ? ($x,      $y + 1, 'N') :
+        $dir eq 'W' ? ($x,      $y,     'E') :
+        $dir eq 'E' ? ($x + 1,  $y,     'E') :
+            croak "wrong direction";
+
+    return @idx;
+}
+
 sub isWallOpen($$$){
     my ($self, $x, $y, $dir) = @_;
 
-    my $out =
-        $dir eq 'N' ? $self->{doors}[$x][$y]{N}     :
-        $dir eq 'S' ? $self->{doors}[$x][$y+1]{N}   :
-        $dir eq 'W' ? $self->{doors}[$x][$y]{E}     :
-        $dir eq 'E' ? $self->{doors}[$x+1][$y]{E}   :
-            croak "wrong direction";
+    my ($wx, $wy, $wdir) = $self->_getWallIndex($x, $y, $dir);    
 
-    return $out || 0;
+    return $self->{door}[$wx][$wy]{$wdir} || 0;
 }
 
 sub openWall($$$) {
+
     my ($self, $x, $y, $dir) = @_;
 
-    $dir eq 'N' ? $self->{doors}[$x][$y]{N}     = 1 :
-    $dir eq 'S' ? $self->{doors}[$x][$y+1]{N}   = 1 :
-    $dir eq 'W' ? $self->{doors}[$x][$y]{E}     = 1 :
-    $dir eq 'E' ? $self->{doors}[$x+1][$y]{E}   = 1 :
-        croak "wrong direction";
+    my ($wx, $wy, $wdir) = $self->_getWallIndex($x, $y, $dir);    
+
+    $self->{door}[$wx][$wy]{$wdir} = 1;
 }
 
 sub getCellNeighbors($$$){
