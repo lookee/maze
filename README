@@ -21,7 +21,9 @@ requires:
 
 PNG
 
-![Maze PNG](./samples/maze200x200.png))
+<p align="center">
+  <img src="https://raw.githubusercontent.com/lookee/maze/master/samples/maze200x200.png" alt="MAZE PNG">
+</p>
 
 ASCII
 
