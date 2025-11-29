@@ -20,7 +20,8 @@ requires:
     - GD
 
 PNG
-![Maze PNG](https://github.com/lookee/maze/blob/master/samples/maze200x200.png?raw=true)
+
+![Maze PNG](https://raw.githubusercontent.com/lookee/maze/master/samples/maze200x200.png)
 
 ASCII
 
