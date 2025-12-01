@@ -12,6 +12,8 @@ https://www.lucaamore.com
 
 A simple maze generator and solver written in perl
 
+post: https://www.lucaamore.com/?p=583
+
 output:
     - ASCII
     - PNG
