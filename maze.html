@@ -1,0 +1,331 @@
+<!doctype html>
+<!--
+  Labirinto — generatore e risolutore JavaScript, adattato dal codice Perl.
+  SPDX-License-Identifier: GPL-3.0-or-later
+
+  Questo programma è software libero: è possibile ridistribuirlo e/o modificarlo
+  secondo i termini della GNU General Public License pubblicata dalla
+  Free Software Foundation, versione 3 o (a propria scelta) qualsiasi versione
+  successiva.
+
+  Il programma è distribuito nella speranza che sia utile, ma SENZA ALCUNA
+  GARANZIA, neppure le garanzie implicite di COMMERCIABILITÀ o IDONEITÀ A UNO
+  SCOPO PARTICOLARE. Per i termini completi della GNU GPL consultare:
+  https://www.gnu.org/licenses/gpl-3.0.html
+
+  Luca Amore
+  https://www.lucaamore.com
+  post: https://www.lucaamore.com/?p=583
+
+-->
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Labirinto</title>
+  <style>
+    /* Impaginazione adattabile: il Canvas conserva le sue proporzioni
+       e i controlli vanno a capo quando lo spazio disponibile diminuisce. */
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100svh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: #f2f2f2;
+      color: #222;
+      font-family: system-ui, sans-serif;
+    }
+    main { width: min(100%, 902px); }
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: white;
+      box-shadow: 0 10px 40px #0000000d;
+    }
+    nav, form { display: flex; align-items: end; flex-wrap: wrap; gap: 8px; }
+    nav { margin-top: 16px; }
+    label { display: grid; gap: 4px; font-size: 13px; }
+    input {
+      width: 90px;
+      padding: 10px;
+      border: 1px solid #d5d5d5;
+      border-radius: 6px;
+      background: white;
+      color: inherit;
+      font: 16px system-ui, sans-serif;
+    }
+    button {
+      padding: 10px 15px;
+      border: 1px solid #d5d5d5;
+      border-radius: 6px;
+      background: white;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+    }
+    button:hover { background: #e9e9e9; }
+    button:focus-visible, input:focus-visible { outline: 2px solid #222; outline-offset: 3px; }
+    button[aria-pressed="true"] { border-color: #b91c1c; color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <main>
+    <!-- Il labirinto viene disegnato dal JavaScript; il testo alternativo
+         descrive ingresso, uscita e stato della soluzione agli screen reader. -->
+    <canvas id="maze" role="img" aria-label="Labirinto di 60 colonne e 40 righe, con ingresso in alto a sinistra, uscita in basso a destra e soluzione rossa.">
+      Il browser deve supportare Canvas per visualizzare il labirinto.
+    </canvas>
+    <nav aria-label="Controlli del labirinto">
+      <!-- Il modulo accetta interi da 1 a 500 per ciascuna dimensione.
+           L'invio con il tasto Invio equivale al pulsante Nuovo labirinto. -->
+      <form id="dimensions">
+        <label for="columns">Colonne
+          <input id="columns" name="columns" type="number" min="1" max="500" step="1" value="60" required>
+        </label>
+        <label for="rows">Righe
+          <input id="rows" name="rows" type="number" min="1" max="500" step="1" value="40" required>
+        </label>
+        <button id="generate" type="submit">Nuovo labirinto</button>
+      </form>
+      <button id="solution" type="button" aria-pressed="true">Soluzione</button>
+      <button id="download" type="button">Scarica PNG</button>
+    </nav>
+  </main>
+  <script>
+    'use strict';
+
+    /**
+     * Modello della griglia, indipendente dai controlli della pagina.
+     * L'origine (0, 0) è in alto a sinistra; x cresce verso destra, y verso il basso.
+     * doors contiene le pareti aperte, solution le coordinate del percorso risolutivo.
+     * N, S, W, E indicano rispettivamente nord, sud, ovest ed est.
+     */
+    class Maze {
+      constructor(width = 60, height = 40) {
+        this.width = width;
+        this.height = height;
+        this.doors = new Set();
+        this.solution = new Set();
+        // L'ingresso è sul bordo superiore, l'uscita sul bordo inferiore.
+        this.openWall(0, 0, 'N');
+        this.openWall(width - 1, height - 1, 'S');
+      }
+
+      // Ogni parete condivisa ha una sola chiave, come nel Perl originale.
+      // Il sud di (x, y) coincide con il nord di (x, y + 1);
+      // l'est di (x, y) coincide con l'ovest di (x + 1, y).
+      wallKey(x, y, direction) {
+        switch (direction) {
+          case 'N': return `${x},${y},N`;
+          case 'S': return `${x},${y + 1},N`;
+          case 'W': return `${x},${y},E`;
+          case 'E': return `${x + 1},${y},E`;
+          default: throw new Error('Direzione non valida');
+        }
+      }
+
+      // Rimuove una parete registrando l'apertura; Set evita i duplicati.
+      openWall(x, y, direction) {
+        this.doors.add(this.wallKey(x, y, direction));
+      }
+
+      // Interroga la stessa chiave anche quando si arriva dalla cella opposta.
+      isWallOpen(x, y, direction) {
+        return this.doors.has(this.wallKey(x, y, direction));
+      }
+
+      // Restituisce solo le celle adiacenti interne alla griglia con la direzione di accesso.
+      neighbors(x, y) {
+        return [
+          [x - 1, y, 'W'], [x + 1, y, 'E'],
+          [x, y - 1, 'N'], [x, y + 1, 'S']
+        ].filter(([nx, ny]) => nx >= 0 && nx < this.width && ny >= 0 && ny < this.height);
+      }
+
+      // Mescolamento Fisher–Yates: rende casuale l'ordine di esplorazione.
+      shuffledNeighbors(x, y) {
+        const neighbors = this.neighbors(x, y);
+        for (let i = neighbors.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [neighbors[i], neighbors[j]] = [neighbors[j], neighbors[i]];
+        }
+        return neighbors;
+      }
+
+      // La destinazione è sempre l'ultima cella in basso a destra.
+      isExit(x, y) {
+        return x === this.width - 1 && y === this.height - 1;
+      }
+
+      // DFS con pila esplicita: equivale alla ricorsione senza limitarne la profondità.
+      // Ogni nuova cella viene collegata una sola volta: il labirinto non contiene cicli.
+      asterione() {
+        const visited = new Set(['0,0']);
+        // Come nel Perl, l'esplorazione non prosegue oltre la cella di uscita.
+        const frame = (x, y) => ({
+          x, y, neighbors: this.isExit(x, y) ? [] : this.shuffledNeighbors(x, y)
+        });
+        const stack = [frame(0, 0)];
+        while (stack.length) {
+          const current = stack[stack.length - 1];
+          if (!current.neighbors.length) {
+            // Vicini esauriti: torna alla cella precedente (backtracking).
+            stack.pop();
+            continue;
+          }
+          const [x, y, direction] = current.neighbors.pop();
+          const key = `${x},${y}`;
+          if (visited.has(key)) continue;
+          visited.add(key);
+          this.openWall(current.x, current.y, direction);
+          stack.push(frame(x, y));
+        }
+      }
+
+      // Cerca l'uscita con una seconda DFS, attraversando solo le pareti aperte.
+      // La pila conserva il percorso corrente; i vicoli ciechi vengono rimossi.
+      teseo() {
+        this.solution.clear();
+        const visited = new Set(['0,0']);
+        const frame = (x, y) => ({
+          x, y, neighbors: this.shuffledNeighbors(x, y)
+            .filter(([, , direction]) => this.isWallOpen(x, y, direction))
+        });
+        const stack = [frame(0, 0)];
+        while (stack.length) {
+          const current = stack[stack.length - 1];
+          if (this.isExit(current.x, current.y)) {
+            // All'arrivo, la pila coincide con il percorso dall'ingresso all'uscita.
+            for (const { x, y } of stack) this.solution.add(`${x},${y}`);
+            return true;
+          }
+          if (!current.neighbors.length) {
+            stack.pop();
+            continue;
+          }
+          const [x, y] = current.neighbors.pop();
+          const key = `${x},${y}`;
+          if (visited.has(key)) continue;
+          visited.add(key);
+          stack.push(frame(x, y));
+        }
+        return false;
+      }
+
+      // Disegna la rappresentazione grafica: fondo bianco, soluzione rossa, muri neri.
+      // cellSize è il lato logico di ogni cella; il CSS adatta l'immagine alla pagina.
+      toCanvas(canvas, showSolution = true, cellSize = 10) {
+        // Un pixel aggiuntivo lascia spazio ai bordi destro e inferiore.
+        const width = this.width * cellSize + 1;
+        const height = this.height * cellSize + 1;
+        // Mantiene il Canvas entro 16 megapixel anche con griglie grandi e schermi Retina.
+        const scale = Math.min(Math.max(1, window.devicePixelRatio || 1), Math.sqrt(16000000 / (width * height)));
+        canvas.width = Math.round(width * scale);
+        canvas.height = Math.round(height * scale);
+        const ctx = canvas.getContext('2d');
+        // Le coordinate di disegno restano indipendenti dalla risoluzione effettiva.
+        ctx.setTransform(canvas.width / width, 0, 0, canvas.height / height, 0, 0);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, width, height);
+        if (showSolution) {
+          // La soluzione si colora prima dei muri, che rimangono visibili sopra.
+          ctx.fillStyle = '#ff0000';
+          for (const key of this.solution) {
+            const [x, y] = key.split(',').map(Number);
+            ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+          }
+          // Porta il colore fino al bordo delle due aperture esterne.
+          ctx.fillRect(0, 0, cellSize, 1);
+          ctx.fillRect((this.width - 1) * cellSize, height - 1, cellSize, 1);
+        }
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1;
+        ctx.lineCap = 'square';
+        ctx.beginPath();
+        const line = (x1, y1, x2, y2) => {
+          // Il mezzo pixel allinea tratti di spessore 1 alla griglia logica dei pixel.
+          ctx.moveTo(x1 + 0.5, y1 + 0.5);
+          ctx.lineTo(x2 + 0.5, y2 + 0.5);
+        };
+        // Ogni muro interno viene disegnato una volta sola, come nord o ovest.
+        for (let y = 0; y < this.height; y++) {
+          for (let x = 0; x < this.width; x++) {
+            if (!this.isWallOpen(x, y, 'N')) {
+              line(x * cellSize, y * cellSize, (x + 1) * cellSize, y * cellSize);
+            }
+            if (!this.isWallOpen(x, y, 'W')) {
+              line(x * cellSize, y * cellSize, x * cellSize, (y + 1) * cellSize);
+            }
+          }
+          // Completa il bordo esterno destro.
+          if (!this.isWallOpen(this.width - 1, y, 'E')) {
+            line(width - 1, y * cellSize, width - 1, (y + 1) * cellSize);
+          }
+        }
+        // Completa il bordo inferiore lasciando aperta l'uscita.
+        for (let x = 0; x < this.width; x++) {
+          if (!this.isWallOpen(x, this.height - 1, 'S')) {
+            line(x * cellSize, height - 1, (x + 1) * cellSize, height - 1);
+          }
+        }
+        ctx.stroke();
+      }
+    }
+
+    // Collegamento tra modello, Canvas e controlli HTML.
+    const canvas = document.getElementById('maze');
+    const dimensionsForm = document.getElementById('dimensions');
+    const columnsInput = document.getElementById('columns');
+    const rowsInput = document.getElementById('rows');
+    const solutionButton = document.getElementById('solution');
+    let maze;
+    let showSolution = true;
+
+    // Ridisegna senza rigenerare e aggiorna la descrizione accessibile.
+    function draw() {
+      maze.toCanvas(canvas, showSolution);
+      canvas.setAttribute('aria-label', `Labirinto di ${maze.width} colonne e ${maze.height} righe, ingresso in alto a sinistra e uscita in basso a destra.${showSolution ? ' Soluzione evidenziata in rosso.' : ''}`);
+    }
+
+    // La validazione HTML impedisce valori vuoti, frazionari o fuori dai limiti.
+    // Ogni generazione crea un modello nuovo e ne calcola subito la soluzione.
+    function generate() {
+      if (!dimensionsForm.reportValidity()) return;
+      maze = new Maze(columnsInput.valueAsNumber, rowsInput.valueAsNumber);
+      maze.asterione();
+      maze.teseo();
+      draw();
+    }
+
+    dimensionsForm.addEventListener('submit', event => {
+      // Gestisce il modulo nella pagina, senza navigazione o ricaricamento.
+      event.preventDefault();
+      generate();
+    });
+    solutionButton.addEventListener('click', () => {
+      // Cambia solo la visibilità: labirinto e percorso calcolato restano gli stessi.
+      showSolution = !showSolution;
+      solutionButton.setAttribute('aria-pressed', String(showSolution));
+      draw();
+    });
+    document.getElementById('download').addEventListener('click', () => {
+      // Esporta l'immagine attualmente visibile, con o senza soluzione.
+      canvas.toBlob(blob => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'labirinto.png';
+        link.click();
+        // Libera l'URL temporaneo dopo aver avviato il download.
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }, 'image/png');
+    });
+    // All'apertura mostra subito un labirinto con le dimensioni predefinite.
+    generate();
+  </script>
+</body>
+</html>
