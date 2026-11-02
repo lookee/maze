@@ -10,6 +10,11 @@ https://www.lucaamore.com
 
 -------------------------------------------------------------
 
+ONLINE DEMO
+https://lookee.github.io/maze/maze.html
+
+-------------------------------------------------------------
+
 A simple maze generator and solver written in perl
 
 post: https://www.lucaamore.com/?p=583
