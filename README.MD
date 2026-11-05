@@ -10,7 +10,7 @@ https://www.lucaamore.com
 
 -------------------------------------------------------------
 
-ONLINE DEMO
+*ONLINE DEMO*
 https://lookee.github.io/maze/maze.html
 
 -------------------------------------------------------------
